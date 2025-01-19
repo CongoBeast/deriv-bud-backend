@@ -64,15 +64,15 @@ const axiosInstance = axios.create({
   });
 
 
-app.post('/submit-package', (req, res) => {
+app.post('/submit-trade', (req, res) => {
     const packageData = req.body;
     if (!packageData._id) {
       packageData._id = generateId();
     }
   
     const data = JSON.stringify({
-      "collection": "packages",
-      "database": "carryon",
+      "collection": "trades",
+      "database": "deriv-bud",
       "dataSource": "Cluster0",
       "document": packageData
     });
@@ -88,6 +88,68 @@ app.post('/submit-package', (req, res) => {
   });
 
 
+app.get('/trades', (req, res) => {
+  const filter = req.query.filter; // Get the filter from the request
+  const pipeline = [];
+
+  // Determine the date range based on the filter
+  if (filter === 'today') {
+    const startOfDay = moment().startOf('day').toISOString();
+    const endOfDay = moment().endOf('day').toISOString();
+    pipeline.push({
+      $match: {
+        date: {
+          $gte: new Date(startOfDay),
+          $lt: new Date(endOfDay),
+        },
+      },
+    });
+  } else if (filter === 'yesterday') {
+    const startOfYesterday = moment().subtract(1, 'days').startOf('day').toISOString();
+    const endOfYesterday = moment().subtract(1, 'days').endOf('day').toISOString();
+    pipeline.push({
+      $match: {
+        date: {
+          $gte: new Date(startOfYesterday),
+          $lt: new Date(endOfYesterday),
+        },
+      },
+    });
+  } else if (filter === 'dayBefore') {
+    const startOfDayBefore = moment().subtract(2, 'days').startOf('day').toISOString();
+    const endOfDayBefore = moment().subtract(2, 'days').endOf('day').toISOString();
+    pipeline.push({
+      $match: {
+        date: {
+          $gte: new Date(startOfDayBefore),
+          $lt: new Date(endOfDayBefore),
+        },
+      },
+    });
+  }
+
+  // Prepare the request payload
+  const data = JSON.stringify({
+    collection: 'trades', // Change to your trades collection name
+    database: 'deriv-bud', // Replace with your database name
+    dataSource: 'Cluster0', // Replace with your data source
+    pipeline: pipeline, // Use the pipeline for filtering
+  });
+
+  // Send the request to the backend
+  axios({ ...apiConfig, url: `${apiConfig.urlBase}aggregate`, data })
+    .then((response) => {
+      res.json(response.data.documents); // Return the filtered trades
+    })
+    .catch((error) => {
+      console.error('Error:', error);
+      res.status(500).send(error);
+    });
+});
+
+module.exports = app;
+
+
   const registerUser = async (userData) => {
 
     console.log(userData)
@@ -96,7 +158,7 @@ app.post('/submit-package', (req, res) => {
       // Check if the username exists
       let response = await axiosInstance.post('findOne', {
         dataSource: 'Cluster0', // Replace with your data source name
-        database: 'carryon', // Replace with your database name
+        database: 'deriv-bud', // Replace with your database name
         collection: 'users', // Replace with your collection name
         filter: { username: userData.username },
       });
@@ -108,7 +170,7 @@ app.post('/submit-package', (req, res) => {
       // Check if the email exists
       response = await axiosInstance.post('findOne', {
         dataSource: 'Cluster0',
-        database: 'carryon',
+        database: 'deriv-bud',
         collection: 'users',
         filter: { email: userData.email },
       });
@@ -120,7 +182,7 @@ app.post('/submit-package', (req, res) => {
       // Register the new user
       response = await axiosInstance.post('insertOne', {
         dataSource: 'Cluster0',
-        database: 'carryon',
+        database: 'deriv-bud',
         collection: 'users',
         document: { ...userData, signupTimestamp: new Date() },
       });
@@ -160,7 +222,7 @@ app.post('/submit-package', (req, res) => {
   
     const data = JSON.stringify({
       "collection": "users",
-      "database": "carryon",
+      "database": "deriv-bud",
       "dataSource": "Cluster0",
       "filter": { username }
     });
@@ -177,7 +239,7 @@ app.post('/submit-package', (req, res) => {
           const loginTimestamp = new Date().toISOString();
           const updateData = JSON.stringify({
             "collection": "users",
-            "database": "carryon",
+            "database": "deriv-bud",
             "dataSource": "Cluster0",
             "filter": { "_id": user._id },
             "update": { "$set": { isLoggedOn: true, loginTimestamp } }
