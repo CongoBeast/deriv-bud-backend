@@ -128,26 +128,56 @@ app.get('/trades', (req, res) => {
     });
   }
 
-  // Prepare the request payload
   const data = JSON.stringify({
-    collection: 'trades', // Change to your trades collection name
-    database: 'deriv-bud', // Replace with your database name
-    dataSource: 'Cluster0', // Replace with your data source
-    pipeline: pipeline, // Use the pipeline for filtering
+    "collection": "trades",
+    "database": "deriv-bud",
+    "dataSource": "Cluster0",
+    // "filter": {}
+    "pipeline": pipeline
   });
 
-  // Send the request to the backend
+  // axios({ ...apiConfig, url: `${apiConfig.urlBase}find`, data })
   axios({ ...apiConfig, url: `${apiConfig.urlBase}aggregate`, data })
-    .then((response) => {
-      res.json(response.data.documents); // Return the filtered trades
+    .then(response => {
+      res.json(response.data.documents);
     })
-    .catch((error) => {
+    .catch(error => {
       console.error('Error:', error);
       res.status(500).send(error);
     });
+
 });
 
-module.exports = app;
+app.put('/edit-trade/:id', (req, res) => {
+    const { id } = req.params; // Trade ID from the URL
+    const { amount, status } = req.body; // Updated fields from the request body
+  
+    // Prepare the update object
+    const update = { status }; // Always update the status
+    if (amount !== undefined) {
+      update.outcome = amount; // Update amount only if it's provided
+    }
+  
+    const data = JSON.stringify({
+      collection: "trades", // Replace with your collection name
+      database: "deriv-bud", // Replace with your database name
+      dataSource: "Cluster0", // Replace with your data source
+      filter: { _id: { $oid: id } }, // Filter by trade ID (convert string ID to ObjectId)
+      update: { $set: update }, // Update the specified fields
+    });
+
+    console.log(update)
+  
+    // Send the request to the MongoDB Data API
+    axios({ ...apiConfig, url: `${apiConfig.urlBase}updateOne`, data })
+      .then(response => {
+        res.json(response.data); // Return the response from the Data API
+      })
+      .catch(error => {
+        console.error('Error updating trade:', error);
+        res.status(500).send(error);
+      });
+  });
 
 
   const registerUser = async (userData) => {
@@ -218,7 +248,7 @@ module.exports = app;
   app.post('/login', (req, res) => {
     const { username, password } = req.body;
 
-    // console.log(bcrypt.hash(password, 10))
+    console.log(username)
   
     const data = JSON.stringify({
       "collection": "users",
