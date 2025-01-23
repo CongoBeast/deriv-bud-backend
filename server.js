@@ -6,12 +6,21 @@ const crypto = require('crypto');
 const moment = require('moment');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const cloudinary = require("cloudinary").v2;
 
 const app = express();
 const PORT = 3005;
 app.use(express.json());
 
 const JWT_SECRET = 'your_jwt_secret'; // Use a strong, secret key in production
+
+
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: "dxxlrzouc", // Replace with your Cloudinary cloud name
+  api_key: "191187614991536", // Replace with your Cloudinary API key
+  api_secret: "9b75q3SXcar-yJFsWQsfXWFhnM8", // Replace with your Cloudinary API secret
+});
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -162,12 +171,12 @@ app.put('/edit-trade/:id', (req, res) => {
       collection: "trades", // Replace with your collection name
       database: "deriv-bud", // Replace with your database name
       dataSource: "Cluster0", // Replace with your data source
-      filter: { _id: { $oid: id } }, // Filter by trade ID (convert string ID to ObjectId)
+      filter: { _id: id }, // Filter by trade ID (convert string ID to ObjectId)
       update: { $set: update }, // Update the specified fields
     });
 
     console.log(update)
-  
+
     // Send the request to the MongoDB Data API
     axios({ ...apiConfig, url: `${apiConfig.urlBase}updateOne`, data })
       .then(response => {
@@ -178,6 +187,54 @@ app.put('/edit-trade/:id', (req, res) => {
         res.status(500).send(error);
       });
   });
+
+  // Add Signal Route
+app.post("/submit-signal", async (req, res) => {
+  const { symbol, entry, stoploss, target, image } = req.body;
+
+  try {
+    // Upload image to Cloudinary
+    const cloudinaryResponse = await cloudinary.uploader.upload(image, {
+      folder: "trade-signals", // Optional: Organize images in a folder
+    });
+
+    // Prepare the trade data
+    const tradeData = {
+      symbol,
+      entry,
+      stoploss,
+      target,
+      imageUrl: cloudinaryResponse.secure_url, // Store the Cloudinary image URL
+      _id: generateId(), // Generate a unique ID if not provided
+    };
+
+    // Insert the trade data into MongoDB
+    const data = JSON.stringify({
+      collection: "signals",
+      database: "deriv-bud",
+      dataSource: "Cluster0",
+      document: tradeData,
+    });
+
+    const response = await axios({
+      ...apiConfig,
+      url: `${apiConfig.urlBase}insertOne`,
+      method: "post",
+      headers: {
+        "Content-Type": "application/json",
+        "api-key": apiConfig.apiKey,
+      },
+      data,
+    });
+
+    res.status(201).json(response.data);
+  } catch (error) {
+    console.error("Error submitting trade:", error);
+    res.status(500).json({ message: "Failed to submit trade", error: error.message });
+  }
+});
+
+
 
 
   const registerUser = async (userData) => {
