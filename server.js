@@ -97,6 +97,65 @@ app.post('/submit-trade', (req, res) => {
   });
 
 
+// app.get('/trades', (req, res) => {
+//   const filter = req.query.filter; // Get the filter from the request
+//   const pipeline = [];
+
+//   // Determine the date range based on the filter
+//   if (filter === 'today') {
+//     const startOfDay = moment().startOf('day').toISOString();
+//     const endOfDay = moment().endOf('day').toISOString();
+//     pipeline.push({
+//       $match: {
+//         date: {
+//           $gte: new Date(startOfDay),
+//           $lt: new Date(endOfDay),
+//         },
+//       },
+//     });
+//   } else if (filter === 'yesterday') {
+//     const startOfYesterday = moment().subtract(1, 'days').startOf('day').toISOString();
+//     const endOfYesterday = moment().subtract(1, 'days').endOf('day').toISOString();
+//     pipeline.push({
+//       $match: {
+//         date: {
+//           $gte: new Date(startOfYesterday),
+//           $lt: new Date(endOfYesterday),
+//         },
+//       },
+//     });
+//   } else if (filter === 'dayBefore') {
+//     const startOfDayBefore = moment().subtract(2, 'days').startOf('day').toISOString();
+//     const endOfDayBefore = moment().subtract(2, 'days').endOf('day').toISOString();
+//     pipeline.push({
+//       $match: {
+//         date: {
+//           $gte: new Date(startOfDayBefore),
+//           $lt: new Date(endOfDayBefore),
+//         },
+//       },
+//     });
+//   }
+
+//   const data = JSON.stringify({
+//     "collection": "trades",
+//     "database": "deriv-bud",
+//     "dataSource": "Cluster0",
+//     // "filter": {}
+//     "pipeline": pipeline
+//   });
+
+//   // axios({ ...apiConfig, url: `${apiConfig.urlBase}find`, data })
+//   axios({ ...apiConfig, url: `${apiConfig.urlBase}aggregate`, data })
+//     .then(response => {
+//       res.json(response.data.documents);
+//     })
+//     .catch(error => {
+//       console.error('Error:', error);
+//       res.status(500).send(error);
+//     });
+
+// });
 app.get('/trades', (req, res) => {
   const filter = req.query.filter; // Get the filter from the request
   const pipeline = [];
@@ -137,15 +196,20 @@ app.get('/trades', (req, res) => {
     });
   }
 
+  // Add a $sort stage to sort by date in descending order (latest first)
+  pipeline.push({
+    $sort: {
+      date: -1, // -1 for descending order (latest first)
+    },
+  });
+
   const data = JSON.stringify({
     "collection": "trades",
     "database": "deriv-bud",
     "dataSource": "Cluster0",
-    // "filter": {}
     "pipeline": pipeline
   });
 
-  // axios({ ...apiConfig, url: `${apiConfig.urlBase}find`, data })
   axios({ ...apiConfig, url: `${apiConfig.urlBase}aggregate`, data })
     .then(response => {
       res.json(response.data.documents);
@@ -154,7 +218,6 @@ app.get('/trades', (req, res) => {
       console.error('Error:', error);
       res.status(500).send(error);
     });
-
 });
 
 app.put('/edit-trade/:id', (req, res) => {
