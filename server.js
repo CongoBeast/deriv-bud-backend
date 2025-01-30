@@ -97,65 +97,322 @@ app.post('/submit-trade', (req, res) => {
   });
 
 
-// app.get('/trades', (req, res) => {
-//   const filter = req.query.filter; // Get the filter from the request
-//   const pipeline = [];
+  app.get('/stats', async (req, res) => {
+    try {
+      const currentDate = moment(); // Get the current date
+      const currentMonthStart = currentDate.clone().startOf('month').toISOString();
+      const currentMonthEnd = currentDate.clone().endOf('month').toISOString();
+      const previousMonthStart = currentDate.clone().subtract(1, 'month').startOf('month').toISOString();
+      const previousMonthEnd = currentDate.clone().subtract(1, 'month').endOf('month').toISOString();
+      const currentWeekStart = currentDate.clone().startOf('week').toISOString();
+      const currentWeekEnd = currentDate.clone().endOf('week').toISOString();
+      const previousWeekStart = currentDate.clone().subtract(1, 'week').startOf('week').toISOString();
+      const previousWeekEnd = currentDate.clone().subtract(1, 'week').endOf('week').toISOString();
+  
+      // Define the aggregation pipeline for each time period
+      const pipeline = [
+        {
+          $facet: {
+            currentMonth: [
+              {
+                $match: {
+                  date: {
+                    $gte: new Date(currentMonthStart),
+                    $lt: new Date(currentMonthEnd),
+                  },
+                },
+              },
+              {
+                $group: {
+                  _id: null,
+                  totalTrades: { $sum: 1 },
+                  totalProfit: { 
+                    $sum: { 
+                      $cond: [ 
+                        { $eq: ["$status", "Profit"] }, 
+                        { $toDouble: "$outcome" }, 
+                        0 
+                      ] 
+                    } 
+                  },
+                  totalLoss: { 
+                    $sum: { 
+                      $cond: [ 
+                        { $eq: ["$status", "Loss"] }, 
+                        { $toDouble: "$outcome" }, 
+                        0 
+                      ] 
+                    } 
+                  },
+                  winningTrades: { $sum: { $cond: [{ $eq: ["$status", "Profit"] }, 1, 0] } },
+                  losingTrades: { $sum: { $cond: [{ $eq: ["$status", "Loss"] }, 1, 0] } },
+                },
+              },
+              {
+                $project: {
+                  _id: 0,
+                  totalTrades: 1,
+                  netPnl: { $sum: ["$totalProfit", "$totalLoss"] },
+                  winRate: {
+                    $multiply: [
+                      { $cond: [
+                        { $gt: ["$totalTrades", 0] },  // Prevent division by zero
+                        { $divide: ["$winningTrades", "$totalTrades"] },
+                        0
+                      ]},
+                      100,
+                    ],
+                  },
+                },
+              },
+            ],
+            
+            // Previous Month Stats
+            previousMonth: [
+              {
+                $match: {
+                  date: {
+                    $gte: new Date(previousMonthStart),
+                    $lt: new Date(previousMonthEnd),
+                  },
+                },
+              },
+              {
+                $group: {
+                  _id: null,
+                  totalTrades: { $sum: 1 },
+                  totalProfit: { $sum: { $cond: [{ $eq: ["$status", "Profit"] }, "$outcome", 0] } },
+                  totalLoss: { $sum: { $cond: [{ $eq: ["$status", "Loss"] }, "$outcome", 0] } },
+                  winningTrades: { $sum: { $cond: [{ $eq: ["$status", "Profit"] }, 1, 0] } },
+                  losingTrades: { $sum: { $cond: [{ $eq: ["$status", "Loss"] }, 1, 0] } },
+                },
+              },
+              {
+                $project: {
+                  _id: 0,
+                  totalTrades: 1,
+                  netPnl: { $subtract: ["$totalProfit", "$totalLoss"] },
+                  winRate: {
+                    $multiply: [
+                      { $divide: ["$winningTrades", "$totalTrades"] },
+                      100,
+                    ],
+                  },
+                },
+              },
+            ],
+            // Current Week Stats
+            currentWeek: [
+              {
+                $match: {
+                  date: {
+                    $gte: new Date(currentWeekStart),
+                    $lt: new Date(currentWeekEnd),
+                  },
+                },
+              },
+              {
+                $group: {
+                  _id: null,
+                  totalTrades: { $sum: 1 },
+                  totalProfit: { $sum: { $cond: [{ $eq: ["$status", "Profit"] }, "$outcome", 0] } },
+                  totalLoss: { $sum: { $cond: [{ $eq: ["$status", "Loss"] }, "$outcome", 0] } },
+                  winningTrades: { $sum: { $cond: [{ $eq: ["$status", "Profit"] }, 1, 0] } },
+                  losingTrades: { $sum: { $cond: [{ $eq: ["$status", "Loss"] }, 1, 0] } },
+                },
+              },
+              {
+                $project: {
+                  _id: 0,
+                  totalTrades: 1,
+                  netPnl: { $subtract: ["$totalProfit", "$totalLoss"] },
+                  winRate: {
+                    $multiply: [
+                      { $divide: ["$winningTrades", "$totalTrades"] },
+                      100,
+                    ],
+                  },
+                },
+              },
+            ],
+            // Previous Week Stats
+            previousWeek: [
+              {
+                $match: {
+                  date: {
+                    $gte: new Date(previousWeekStart),
+                    $lt: new Date(previousWeekEnd),
+                  },
+                },
+              },
+              {
+                $group: {
+                  _id: null,
+                  totalTrades: { $sum: 1 },
+                  totalProfit: { $sum: { $cond: [{ $eq: ["$status", "Profit"] }, "$outcome", 0] } },
+                  totalLoss: { $sum: { $cond: [{ $eq: ["$status", "Loss"] }, "$outcome", 0] } },
+                  winningTrades: { $sum: { $cond: [{ $eq: ["$status", "Profit"] }, 1, 0] } },
+                  losingTrades: { $sum: { $cond: [{ $eq: ["$status", "Loss"] }, 1, 0] } },
+                },
+              },
+              {
+                $project: {
+                  _id: 0,
+                  totalTrades: 1,
+                  netPnl: { $subtract: ["$totalProfit", "$totalLoss"] },
+                  winRate: {
+                    $multiply: [
+                      { $divide: ["$winningTrades", "$totalTrades"] },
+                      100,
+                    ],
+                  },
+                },
+              },
+            ],
+          },
+        },
+      ];
+  
+      const data = JSON.stringify({
+        collection: "trades",
+        database: "deriv-bud",
+        dataSource: "Cluster0",
+        pipeline: pipeline,
+      });
+  
+      const response = await axios({
+        ...apiConfig,
+        url: `${apiConfig.urlBase}aggregate`,
+        data,
+      });
+  
+      // Format the response
+      const stats = response.data.documents[0];
+      res.json({
+        currentMonth: stats.currentMonth[0] || {},
+        previousMonth: stats.previousMonth[0] || {},
+        currentWeek: stats.currentWeek[0] || {},
+        previousWeek: stats.previousWeek[0] || {},
+      });
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+      res.status(500).send(error);
+    }
+  });
 
-//   // Determine the date range based on the filter
-//   if (filter === 'today') {
-//     const startOfDay = moment().startOf('day').toISOString();
-//     const endOfDay = moment().endOf('day').toISOString();
-//     pipeline.push({
-//       $match: {
-//         date: {
-//           $gte: new Date(startOfDay),
-//           $lt: new Date(endOfDay),
-//         },
-//       },
-//     });
-//   } else if (filter === 'yesterday') {
-//     const startOfYesterday = moment().subtract(1, 'days').startOf('day').toISOString();
-//     const endOfYesterday = moment().subtract(1, 'days').endOf('day').toISOString();
-//     pipeline.push({
-//       $match: {
-//         date: {
-//           $gte: new Date(startOfYesterday),
-//           $lt: new Date(endOfYesterday),
-//         },
-//       },
-//     });
-//   } else if (filter === 'dayBefore') {
-//     const startOfDayBefore = moment().subtract(2, 'days').startOf('day').toISOString();
-//     const endOfDayBefore = moment().subtract(2, 'days').endOf('day').toISOString();
-//     pipeline.push({
-//       $match: {
-//         date: {
-//           $gte: new Date(startOfDayBefore),
-//           $lt: new Date(endOfDayBefore),
-//         },
-//       },
-//     });
-//   }
+  app.get("/trade-stats", (req, res) => {
+    const pipeline = [
+      {
+        $group: {
+          _id: "$symbol",
+          totalTrades: { $sum: "$trades" }, // Total trades per symbol
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: "$totalTrades" }, // Total trades overall
+          symbols: {
+            $push: {
+              symbol: "$_id",
+              trades: "$totalTrades",
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          symbolData: {
+            $map: {
+              input: "$symbols",
+              as: "s",
+              in: {
+                symbol: "$$s.symbol",
+                percentage: {
+                  $multiply: [{ $divide: ["$$s.trades", "$total"] }, 100],
+                },
+              },
+            },
+          },
+        },
+      },
+    ];
+  
+    const tradesPipeline = [
+      {
+        $group: {
+          _id: { month: "$month", symbol: "$symbol" },
+          totalTrades: { $sum: "$trades" }, // Number of trades per month per symbol
+        },
+      },
+      {
+        $group: {
+          _id: "$_id.month",
+          trades: {
+            $push: {
+              symbol: "$_id.symbol",
+              count: "$totalTrades",
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          month: "$_id",
+          trades: 1,
+        },
+      },
+    ];
+  
+    const pnlPipeline = [
+      {
+        $group: {
+          _id: { month: "$month", symbol: "$symbol" },
+          totalPnL: { $sum: "$pnl" }, // P/L per month per symbol
+        },
+      },
+      {
+        $group: {
+          _id: "$_id.month",
+          pnl: {
+            $push: {
+              symbol: "$_id.symbol",
+              value: "$totalPnL",
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          month: "$_id",
+          pnl: 1,
+        },
+      },
+    ];
+  
+    // Fetch data from MongoDB
+    Promise.all([
+      axios({ ...apiConfig, url: `${apiConfig.urlBase}aggregate`, data: JSON.stringify({ collection: "trades", database: "deriv-bud", dataSource: "Cluster0", pipeline }) }),
+      axios({ ...apiConfig, url: `${apiConfig.urlBase}aggregate`, data: JSON.stringify({ collection: "trades", database: "deriv-bud", dataSource: "Cluster0", pipeline: tradesPipeline }) }),
+      axios({ ...apiConfig, url: `${apiConfig.urlBase}aggregate`, data: JSON.stringify({ collection: "trades", database: "deriv-bud", dataSource: "Cluster0", pipeline: pnlPipeline }) }),
+    ])
+      .then(([symbolResponse, tradesResponse, pnlResponse]) => {
+        res.json({
+          symbolData: symbolResponse.data.documents[0]?.symbolData || [],
+          tradesData: tradesResponse.data.documents || [],
+          pnlData: pnlResponse.data.documents || [],
+        });
+      })
+      .catch((error) => {
+        console.error("Error:", error);
+        res.status(500).send(error);
+      });
+  });
 
-//   const data = JSON.stringify({
-//     "collection": "trades",
-//     "database": "deriv-bud",
-//     "dataSource": "Cluster0",
-//     // "filter": {}
-//     "pipeline": pipeline
-//   });
 
-//   // axios({ ...apiConfig, url: `${apiConfig.urlBase}find`, data })
-//   axios({ ...apiConfig, url: `${apiConfig.urlBase}aggregate`, data })
-//     .then(response => {
-//       res.json(response.data.documents);
-//     })
-//     .catch(error => {
-//       console.error('Error:', error);
-//       res.status(500).send(error);
-//     });
-
-// });
 app.get('/trades', (req, res) => {
   const filter = req.query.filter; // Get the filter from the request
   const pipeline = [];
@@ -252,22 +509,62 @@ app.put('/edit-trade/:id', (req, res) => {
   });
 
   // Add Signal Route
+// app.post("/submit-signal", async (req, res) => {
+//   const { symbol, entry, stoploss, target, image } = req.body;
+
+//   try {
+//     // Upload image to Cloudinary
+//     const cloudinaryResponse = await cloudinary.uploader.upload(image, {
+//       folder: "trade-signals", // Optional: Organize images in a folder
+//     });
+
+//     // Prepare the trade data
+//     const tradeData = {
+//       symbol,
+//       entry,
+//       stoploss,
+//       target,
+//       imageUrl: cloudinaryResponse.secure_url, // Store the Cloudinary image URL
+//       _id: generateId(), // Generate a unique ID if not provided
+//     };
+
+//     // Insert the trade data into MongoDB
+//     const data = JSON.stringify({
+//       collection: "signals",
+//       database: "deriv-bud",
+//       dataSource: "Cluster0",
+//       document: tradeData,
+//     });
+
+//     const response = await axios({
+//       ...apiConfig,
+//       url: `${apiConfig.urlBase}insertOne`,
+//       method: "post",
+//       headers: {
+//         "Content-Type": "application/json",
+//         "api-key": apiConfig.apiKey,
+//       },
+//       data,
+//     });
+
+//     res.status(201).json(response.data);
+//   } catch (error) {
+//     console.error("Error submitting trade:", error);
+//     res.status(500).json({ message: "Failed to submit trade", error: error.message });
+//   }
+// });
+
 app.post("/submit-signal", async (req, res) => {
   const { symbol, entry, stoploss, target, image } = req.body;
 
   try {
-    // Upload image to Cloudinary
-    const cloudinaryResponse = await cloudinary.uploader.upload(image, {
-      folder: "trade-signals", // Optional: Organize images in a folder
-    });
-
     // Prepare the trade data
     const tradeData = {
       symbol,
       entry,
       stoploss,
       target,
-      imageUrl: cloudinaryResponse.secure_url, // Store the Cloudinary image URL
+      imageUrl: image, // Use the provided image URL directly
       _id: generateId(), // Generate a unique ID if not provided
     };
 
